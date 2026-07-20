@@ -1,0 +1,48 @@
+# Kaufman et al. 2016 (Science) - Quantum Quench Dynamics
+# "Quantum thermalization through entanglement in an isolated many-body system"
+# 4 Rb-87 atoms, initial localized state + sudden quench
+# Measures entanglement entropy growth over time
+#
+# VALIDATION TARGET:
+#   - Full system purity stays ~1.0 throughout
+#   - Subsystem S2 grows from 0 → ~ln(2) ≈ 0.693
+#   - Subsystem purity drops from 1.0 → ~0.5
+#   - Entanglement oscillates (finite-size revival)
+
+[system]
+name = "Kaufman 2016 - Quantum Quench (4-site)"
+num_particles = 4
+
+[particles]
+# Rb-87 atoms
+mass = [86.909, 86.909, 86.909, 86.909]
+mass_unit = "amu"
+position_x = [0.0, 680.0, 1360.0, 2040.0]
+position_y = [0.0, 0.0, 0.0, 0.0]
+position_z = [0.0, 0.0, 0.0, 0.0]
+position_unit = "nm"
+# QUENCH: pi/2 phase spacing + momentum kicks = driven out of equilibrium
+phase = [0.0, 1.571, 3.142, 4.712]
+velocity_x = [0.0, 0.1, -0.1, 0.0]
+spin = [0.5, 0.5, 0.5, 0.5]
+
+[coupling]
+# U/J = 10 — fixed for quench dynamics
+pauli_strength = 10.0
+torsion_coupling = 1.0
+vacuum_damping = 0.007
+
+[entanglement]
+adjacency = [[0,1], [1,2], [2,3]]
+
+[integration]
+dt = 0.001
+total_ticks = 10000
+grid_resolution = 64
+wave_speed = 65.0
+wave_decay = 0.9999
+
+[output]
+save_trajectories = true
+save_plots = true
+plot_format = "png"

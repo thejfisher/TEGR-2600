@@ -1,0 +1,37 @@
+# Islam et al. 2015 - Ground State at U/J = 2
+# Sweep point for Figure 4 replication
+
+[system]
+name = "Islam 2015 - Ground State (U/J = 2)"
+num_particles = 4
+
+[particles]
+mass = [86.909, 86.909, 86.909, 86.909]
+mass_unit = "amu"
+position_x = [0.0, 680.0, 1360.0, 2040.0]
+position_y = [0.0, 0.0, 0.0, 0.0]
+position_z = [0.0, 0.0, 0.0, 0.0]
+position_unit = "nm"
+phase = [0.0, 0.0, 0.0, 0.0]
+velocity_x = [0.0, 0.0, 0.0, 0.0]
+spin = [0.5, 0.5, 0.5, 0.5]
+
+[coupling]
+pauli_strength = 2.0
+torsion_coupling = 1.0
+vacuum_damping = 0.007
+
+[entanglement]
+adjacency = [[0,1], [1,2], [2,3]]
+
+[integration]
+dt = 0.001
+total_ticks = 10000
+grid_resolution = 64
+wave_speed = 65.0
+wave_decay = 0.9999
+
+[output]
+save_trajectories = true
+save_plots = true
+plot_format = "png"

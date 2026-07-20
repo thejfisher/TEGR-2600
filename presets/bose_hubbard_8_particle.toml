@@ -1,0 +1,39 @@
+# Area Law Scaling Check
+# 8 Rb-87 atoms, GROUND STATE
+# Sweep U/J to check if half-chain entropy scales with boundary area (constant ~ln(2))
+
+[system]
+name = "Area Law Scaling 8-Particle"
+num_particles = 8
+
+[particles]
+# Rb-87 atoms
+mass = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+mass_unit = "sim"
+position_x = [0.0, 680.0, 1360.0, 2040.0, 2720.0, 3400.0, 4080.0, 4760.0]
+position_y = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+position_z = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+position_unit = "nm"
+phase = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+velocity_x = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+spin = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+[coupling]
+pauli_strength = 10.0
+torsion_coupling = 1.0
+vacuum_damping = 0.007
+
+[entanglement]
+adjacency = [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [6,7]]
+
+[integration]
+dt = 0.001
+total_ticks = 10000
+grid_resolution = 64
+wave_speed = 65.0
+wave_decay = 0.9999
+
+[output]
+save_trajectories = true
+save_plots = true
+plot_format = "png"
