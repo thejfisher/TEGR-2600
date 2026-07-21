@@ -83,3 +83,6 @@ VRAM Reserved:  0.04 GB
 -----------------------------
 *Note: Base system RAM is 12GB; overage reflects OS-level pagefile/shared memory allocation.
 ```
+
+## References
+1. Ruan, Z., et al. "Spatial Photonic Ising Machine." Research exploring spatial light modulators and coherent optical propagation to solve NP-hard Max-Cut problems. While physical SPIMs execute the core Hamiltonian optically in microseconds ($\mu$s), the TEGR 2600 framework successfully mirrors these quantum phase transitions purely through localized geometric CPU processing.
