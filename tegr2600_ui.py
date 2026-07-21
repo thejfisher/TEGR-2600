@@ -15,6 +15,10 @@ import sys
 import os
 import numpy as np
 from pathlib import Path
+import time
+import psutil
+import platform
+import torch
 
 # Add the TEGR 2600 directory to the Python path
 TEGR_DIR = Path(__file__).parent
@@ -623,6 +627,7 @@ class TEGR2600Window(QMainWindow):
 
         # Launch worker thread
         self.sim_seconds = 0
+        self.run_start_time = time.time()
         self.timer_label.setText("Time: 00:00")
         self.sim_timer.start(1000)
 
@@ -649,7 +654,25 @@ class TEGR2600Window(QMainWindow):
         self.btn_export.setEnabled(True)
 
         T, N, _ = trajectory.shape
-        self.log(f"Simulation complete: {T} ticks, {N} particles")
+        elapsed = time.time() - self.run_start_time
+        
+        # Log basic simulation metrics
+        self.log(f"Simulation complete: {T} ticks, {N} particles in {elapsed:.2f} seconds")
+        
+        # Log system resources
+        self.log(f"\n--- System Resources Used ---")
+        self.log(f"CPU: {platform.processor()} ({psutil.cpu_count(logical=False)} Cores) | Util: {psutil.cpu_percent()}%")
+        
+        vm = psutil.virtual_memory()
+        self.log(f"DRAM (System RAM): {vm.used / (1024**3):.1f} GB used / {vm.total / (1024**3):.1f} GB total ({vm.percent}%)")
+        
+        if torch.cuda.is_available():
+            self.log(f"GPU: {torch.cuda.get_device_name(0)}")
+            self.log(f"VRAM Allocated: {torch.cuda.memory_allocated(0) / (1024**3):.2f} GB")
+            self.log(f"VRAM Reserved:  {torch.cuda.memory_reserved(0) / (1024**3):.2f} GB")
+        else:
+            self.log("GPU: No CUDA GPU detected.")
+        self.log(f"-----------------------------\n")
 
         # Compute and display metrics
         self._update_plots()
