@@ -144,7 +144,7 @@ A test projectile was fired radially inward from the Grandparent domain ($r = 19
 | **Parent $\rightarrow$ Child** ($R_c = 5.0$) | $-41.6141$ | $-40.8553$ | $0.9818$ |
 
 $$
-\boxed{\text{Recursive Ratio} = \frac{0.9818}{0.9813} = 1.000464 \quad (\text{deviation: } 0.05\%)}
+\boxed{\text{Recursive Ratio} = \frac{0.9818}{0.9813} = 1.000464 \quad \text{(deviation: 0.05 percent)}}
 $$
 
 The fractional deceleration is identical at both horizons despite the projectile entering the inner boundary 14% slower ($-41.6$ vs $-48.3$). This confirms that:
