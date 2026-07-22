@@ -1,12 +1,16 @@
 """
-TEGR 2600 Physics Engine
-========================
+INNYOUTY 3-Tier Nested Universe Engine
+======================================
+Forked from TEGR 2600 with spatially-dependent FDTD support
+for double-sigmoid nested universe simulations.
+
 Core integration loop implementing:
     1. Damped Klein-Gordon (FDTD wave propagation on 3D Eulerian grid)
+       - Supports spatially varying c^2(r) and decay(r) via sigmoid impedance tensors
     2. Relativistic Adler Equation (RAE phase clock)
     3. Pauli exclusion force (phase-coupled repulsion)
     4. Kuramoto synchronization (entanglement coupling)
-    5. Pilot wave guidance (field gradient → force)
+    5. Pilot wave guidance (field gradient -> force)
 
 Particles are localized geometric defects on a topological coordinate matrix.
 No viscosity. No medium. Pure kinematic coupling and finite-difference gradients.
@@ -20,6 +24,32 @@ from typing import Optional, Tuple, Callable
 
 from config_schema import SimulationConfig
 from utils import trilinear_interpolate_gradient
+
+
+def build_impedance_tensors_3tier(G, grid_min, grid_max, config, device):
+    coords = torch.linspace(grid_min, grid_max, G, device=device)
+    x, y, z = torch.meshgrid(coords, coords, coords, indexing='ij')
+    r_tensor = torch.sqrt(x**2 + y**2 + z**2)
+    
+    R_c = config.nested_radius_child
+    R_p = config.nested_radius_parent
+    k = config.nested_sharpness
+    
+    # Double sigmoid masks
+    mask_child = 1.0 / (1.0 + torch.exp(-k * (r_tensor - R_c)))
+    mask_parent = 1.0 / (1.0 + torch.exp(-k * (r_tensor - R_p)))
+    
+    # Wave speed
+    c_grid = config.c_c + (config.c_p - config.c_c) * mask_child + (config.c_gp - config.c_p) * mask_parent
+    c_sq_grid = (c_grid ** 2).view(1, 1, G, G, G)
+    
+    # Wave decay
+    decay_grid = (config.decay_c + (config.decay_p - config.decay_c) * mask_child + (config.decay_gp - config.decay_p) * mask_parent).view(1, 1, G, G, G)
+    
+    # Pauli exclusion (reshaped for grid_sample compatibility)
+    pauli_grid = (config.pauli_c + (config.pauli_p - config.pauli_c) * mask_child + (config.pauli_gp - config.pauli_p) * mask_parent).view(1, 1, G, G, G)
+    
+    return c_sq_grid, decay_grid, pauli_grid
 
 
 class TEGR2600Engine:
@@ -51,6 +81,9 @@ class TEGR2600Engine:
         self.GRID_MIN = -10.0
         self.GRID_MAX = 10.0
         self.DX = (self.GRID_MAX - self.GRID_MIN) / self.GRID_RES
+
+        # Tensor precision (float32 or float64)
+        self.dtype = torch.float64 if config.precision == 'float64' else torch.float32
 
         # FDTD wave field buffers (allocated on first run)
         self._phi_curr = None
@@ -84,12 +117,12 @@ class TEGR2600Engine:
         G = self.GRID_RES
         device = self.device
 
-        self._phi_curr = torch.zeros((1, 1, G, G, G), device=device, dtype=torch.float32)
-        self._phi_prev = torch.zeros((1, 1, G, G, G), device=device, dtype=torch.float32)
-        self._phi_next = torch.zeros((1, 1, G, G, G), device=device, dtype=torch.float32)
+        self._phi_curr = torch.zeros((1, 1, G, G, G), device=device, dtype=self.dtype)
+        self._phi_prev = torch.zeros((1, 1, G, G, G), device=device, dtype=self.dtype)
+        self._phi_next = torch.zeros((1, 1, G, G, G), device=device, dtype=self.dtype)
 
         # 7-point Laplacian stencil
-        self._laplacian_kernel = torch.zeros((1, 1, 3, 3, 3), device=device, dtype=torch.float32)
+        self._laplacian_kernel = torch.zeros((1, 1, 3, 3, 3), device=device, dtype=self.dtype)
         self._laplacian_kernel[0, 0, 1, 1, 1] = -6.0
         self._laplacian_kernel[0, 0, 1, 1, 0] = 1.0
         self._laplacian_kernel[0, 0, 1, 1, 2] = 1.0
@@ -100,6 +133,96 @@ class TEGR2600Engine:
 
         # Seed initial field from particle positions
         self._seed_field_from_particles(state)
+
+        # --- Impedance Tensor Initialization ---
+        if self.config.emergent_horizons:
+            # Emergent mode: c² and λ derived dynamically from φ field
+            # Start with uniform base values; first _update_emergent_impedance() call
+            # in the hot loop will couple them to the seeded field.
+            c_base_sq = self.config.emergent_c_base ** 2
+            self._c_sq_grid = torch.full((1, 1, G, G, G), c_base_sq, device=device, dtype=self.dtype)
+            self._decay_grid = torch.full((1, 1, G, G, G), self.config.emergent_decay_base, device=device, dtype=self.dtype)
+            self._pauli_grid = None
+            # Precompute CFL ceiling: c_max² = (DX / (DT * sqrt(3)))²
+            self._c_sq_max = (self.DX / (self.DT * 3.0**0.5)) ** 2
+            # Run initial coupling so tick 0 already sees the seeded field
+            self._update_emergent_impedance()
+            print(f"  [EMERGENT HORIZONS] phi-coupled impedance active\n"
+                  f"    c_base={self.config.emergent_c_base}, alpha={self.config.emergent_alpha}\n"
+                  f"    decay_base={self.config.emergent_decay_base}, gamma={self.config.emergent_decay_gamma}\n"
+                  f"    CFL ceiling: c_max={self._c_sq_max**0.5:.2f}")
+        elif self.config.nested_enabled:
+            self._c_sq_grid, self._decay_grid, self._pauli_grid = build_impedance_tensors_3tier(
+                G, self.GRID_MIN, self.GRID_MAX, self.config, device
+            )
+            print(f"  [3-TIER NESTED] Impedance tensors built\n"
+                  f"    Grandparent: c={self.config.c_gp}, decay={self.config.decay_gp}, U={self.config.pauli_gp}\n"
+                  f"    Parent:      c={self.config.c_p},  decay={self.config.decay_p},  U={self.config.pauli_p}\n"
+                  f"    Child:       c={self.config.c_c},  decay={self.config.decay_c},    U={self.config.pauli_c}\n"
+                  f"    R_parent={self.config.nested_radius_parent} | R_child={self.config.nested_radius_child} | k={self.config.nested_sharpness}")
+        else:
+            # Scalar constants as 1x1x1x1x1 tensors for uniform broadcasting (no branching in hot loop)
+            self._c_sq_grid = torch.full((1, 1, 1, 1, 1), self.config.c_p**2, device=device, dtype=self.dtype)
+            self._decay_grid = torch.full((1, 1, 1, 1, 1), self.config.decay_p, device=device, dtype=self.dtype)
+            self._pauli_grid = None
+
+    def _update_emergent_impedance(self):
+        """
+        Recompute c²(r) and λ(r) from the live Klein-Gordon field φ.
+
+        Uses a rational approximation (zero transcendentals):
+            c²(φ) = c_base² / (1 + α|φ|)²
+            λ(φ)  = λ_base * (c²/c_base²)^γ
+
+        As φ accumulates (mass → topological strain), c² drops and
+        damping increases — an event horizon emerges dynamically.
+        """
+        cfg = self.config
+        c_base_sq = cfg.emergent_c_base ** 2
+        alpha = cfg.emergent_alpha
+
+        # Rational approximation: c² = c_base² / (1 + α|φ|)²
+        phi_abs = self._phi_curr.abs()
+        denominator = (1.0 + alpha * phi_abs).square()
+        self._c_sq_grid = c_base_sq / denominator
+
+        # CFL safety clamp (prevent numerical blowup)
+        self._c_sq_grid.clamp_(min=1.0, max=self._c_sq_max)
+
+        # Couple damping to impedance: as c² drops, damping increases
+        # decay = decay_base * (c²/c_base²)^γ   →   dense regions decay faster
+        decay_ratio = self._c_sq_grid / c_base_sq
+        self._decay_grid = cfg.emergent_decay_base * decay_ratio.pow(cfg.emergent_decay_gamma)
+        self._decay_grid.clamp_(min=0.5, max=1.0)  # relaxed floor: gamma=0.075 keeps lambda~0.9
+
+    def _inject_mass_source(self, pos: torch.Tensor, m0: torch.Tensor):
+        """
+        Continuously inject Klein-Gordon field energy at particle positions.
+
+        Mass is a permanent spring, not a one-time impulse. Each tick,
+        particles pump phi proportional to their rest mass:
+            phi += S * sum_i (m_i / m_max) * G(r - r_i, sigma)
+
+        Uses nearest-cell injection for speed (no Gaussian kernel in hot loop).
+        The FDTD diffusion naturally smooths the injected energy over time.
+        """
+        S = self.config.emergent_source_strength
+        if S <= 0:
+            return
+
+        G_res = self.GRID_RES
+        m_max = m0.max().clamp(min=1e-8)
+
+        # Convert particle positions to grid indices
+        grid_idx = ((pos - self.GRID_MIN) / self.DX).long()
+        grid_idx = grid_idx.clamp(1, G_res - 2)  # stay 1 cell from boundary
+
+        # Inject at each particle's nearest cell (O(N) — no grid sweep)
+        for i in range(pos.shape[0]):
+            ix, iy, iz = grid_idx[i, 0].item(), grid_idx[i, 1].item(), grid_idx[i, 2].item()
+            amplitude = S * (m0[i].item() / m_max.item())
+            # Inject into a 3x3x3 neighborhood for smoothness
+            self._phi_curr[0, 0, ix-1:ix+2, iy-1:iy+2, iz-1:iz+2] += amplitude / 27.0
 
     def _seed_field_from_particles(self, state: torch.Tensor):
         """Seed the FDTD grid with Gaussian bumps at each particle position."""
@@ -156,7 +279,12 @@ class TEGR2600Engine:
         print(f"  Grid: {self.GRID_RES}^3 | Wave Speed: {self.C}")
         print(f"  RAE: {'ON' if cfg.rae_mode else 'OFF'} | Pilot Wave: {'ON' if cfg.pilot_wave else 'OFF'}")
         print(f"  Pauli: {cfg.pauli_strength} (1/r^{cfg.pauli_power})")
-        print(f"  Kuramoto K: {cfg.kuramoto_K}")
+        print(f"  Kuramoto K: {cfg.kuramoto_k}")
+        if cfg.nested_enabled:
+            print(f"  [NESTED UNIVERSE] 3-Tier Architecture | R_parent={cfg.nested_radius_parent} | R_child={cfg.nested_radius_child} | k={cfg.nested_sharpness}")
+            print(f"    Grandparent: c={cfg.c_gp}, decay={cfg.decay_gp}, U={cfg.pauli_gp}")
+            print(f"    Parent:      c={cfg.c_p},  decay={cfg.decay_p},  U={cfg.pauli_p}")
+            print(f"    Child:       c={cfg.c_c},  decay={cfg.decay_c},    U={cfg.pauli_c}")
         print(f"{'='*60}\n")
 
         # Move tensors to device
@@ -171,35 +299,52 @@ class TEGR2600Engine:
 
         # Precompute constants
         DT = self.DT
-        C_SQ = self.C_SQ
-        TORSION_DECAY = cfg.wave_decay
         PAULI = cfg.pauli_strength
         LAMBDA_VAC = cfg.vacuum_damping
-        K_SYNC = cfg.kuramoto_K
+        K_SYNC = cfg.kuramoto_k
         TORSION = cfg.torsion_coupling
 
         start_time = time.time()
-        
-        alpha = C_SQ * DT * DT / (self.DX * self.DX)
 
         for tick in range(T):
             # Record state
             trajectory[tick] = state.cpu().numpy()
 
             # =====================================================
+            # 0. EMERGENT IMPEDANCE UPDATE (every tick)
+            #    c²(φ) = c_base² / (1 + α|φ|)²   [rational approx]
+            #    Recomputes c² and λ from live Klein-Gordon field.
+            #    Cost: ~15µs (3 element-wise CUDA ops on 64³ grid)
+            # =====================================================
+            if self.config.emergent_horizons:
+                self._update_emergent_impedance()
+
+            # =====================================================
             # 1. FDTD WAVE PROPAGATION (Damped Klein-Gordon)
+            #    Spatially varying c²(r) and λ(r) for nested universe
             # =====================================================
             laplacian = F.conv3d(self._phi_curr, self._laplacian_kernel, padding=1)
             torch.mul(self._phi_curr, 2.0, out=self._phi_next)
             self._phi_next.sub_(self._phi_prev)
-            self._phi_next.add_(laplacian, alpha=C_SQ * DT * DT / (self.DX * self.DX))
-            self._phi_next.mul_(TORSION_DECAY)
+            alpha_grid = self._c_sq_grid * (DT * DT / (self.DX * self.DX))
+            self._phi_next.add_(laplacian * alpha_grid)
+            self._phi_next.mul_(self._decay_grid)
 
             # Shift buffers
             temp = self._phi_prev
             self._phi_prev = self._phi_curr
             self._phi_curr = self._phi_next
             self._phi_next = temp
+
+            # =====================================================
+            # 1b. CONTINUOUS MASS SOURCING
+            #     Mass is a permanent spring — particles pump phi
+            #     proportional to rest mass every tick.
+            # =====================================================
+            if self.config.emergent_horizons and self.config.emergent_source_strength > 0:
+                pos_for_source = state[:, 1:4]
+                m0_for_source = state[:, 7]
+                self._inject_mass_source(pos_for_source, m0_for_source)
 
             # =====================================================
             # 2. EXTRACT PARTICLE STATE
@@ -217,17 +362,27 @@ class TEGR2600Engine:
             # =====================================================
             # 3. PAULI EXCLUSION FORCE
             # =====================================================
-            if cfg.pauli_enabled and N > 1:
+            # Pairwise vectors needed by both Pauli AND RAE phase clock
+            if N > 1:
                 diff = pos.unsqueeze(1) - pos.unsqueeze(0)         # (N, N, 3)
                 dist_sq = torch.sum(diff**2, dim=2) + 1e-6         # (N, N)
 
+            if cfg.pauli_enabled and N > 1:
                 # Phase coupling: cos(theta_i - theta_j)
                 hue_diff = theta.unsqueeze(1) - theta.unsqueeze(0)  # (N, N)
                 phase_coupling = torch.cos(hue_diff)
 
                 # Force law: chi * cos(dtheta) * r_hat / r^n
                 power_exp = (cfg.pauli_power + 1) / 2.0
-                pauli_force = PAULI * phase_coupling.unsqueeze(2) * diff / dist_sq.unsqueeze(2) ** power_exp
+
+                # FIX 1: Spatially-varying Pauli from double-sigmoid grid
+                if self.config.nested_enabled and self._pauli_grid is not None:
+                    pauli_at_particle = self._sample_field_at_positions(self._pauli_grid, pos)
+                    pauli_local = pauli_at_particle.unsqueeze(1).unsqueeze(2)  # (N, 1, 1)
+                else:
+                    pauli_local = PAULI
+
+                pauli_force = pauli_local * phase_coupling.unsqueeze(2) * diff / dist_sq.unsqueeze(2) ** power_exp
                 pauli_force = torch.sum(pauli_force, dim=1)         # (N, 3)
             else:
                 pauli_force = torch.zeros_like(pos)
@@ -251,6 +406,27 @@ class TEGR2600Engine:
                 damping_force = -LAMBDA_VAC * vel
 
             # =====================================================
+            # 5b. IMPEDANCE COUPLING (quadratic, velocity-dependent)
+            #     F_imp = -beta * |grad(ln c^2)| * |v| * v
+            #     Quadratic coupling ensures CONSTANT FRACTIONAL retention:
+            #       dv/dx = -k*v  =>  v_out = v_in * exp(-∫k dx)
+            #     The fraction retained is independent of entry speed.
+            # =====================================================
+            impedance_force = torch.zeros_like(pos)
+            if self._c_sq_grid is not None:
+                c_sq_grad = trilinear_interpolate_gradient(
+                    self._c_sq_grid, pos, self.GRID_MIN, self.GRID_MAX,
+                    self.GRID_RES, self.DX
+                )  # (N, 3)
+                # Log-gradient for scale-invariance
+                c_sq_local = self._sample_field_at_positions(self._c_sq_grid, pos)  # (N,)
+                c_sq_local = c_sq_local.clamp(min=1.0).unsqueeze(1)  # (N, 1)
+                log_grad_magnitude = torch.norm(c_sq_grad / c_sq_local, dim=1, keepdim=True)  # (N, 1)
+                # Quadratic impedance coupling: F = -beta * |grad(ln c^2)| * |v| * v
+                v_magnitude = torch.norm(vel, dim=1, keepdim=True).clamp(min=1e-8)  # (N, 1)
+                impedance_force = -self.config.impedance_coupling_coeff * log_grad_magnitude * v_magnitude * vel
+
+            # =====================================================
             # 6. PILOT WAVE GUIDANCE
             # =====================================================
             pilot_wave_force = torch.zeros_like(pos)
@@ -265,7 +441,7 @@ class TEGR2600Engine:
             # =====================================================
             # 7. TOTAL FORCE → MOMENTUM UPDATE
             # =====================================================
-            total_force = pauli_force + torsion_force + damping_force + pilot_wave_force
+            total_force = pauli_force + torsion_force + damping_force + impedance_force + pilot_wave_force
 
             # Verlet: p_new = p + F * dt
             mom_new = mom + total_force * DT
@@ -377,6 +553,22 @@ class TEGR2600Engine:
 
         self.trajectory = trajectory
         return trajectory
+
+    def _sample_field_at_positions(self, field: torch.Tensor, pos: torch.Tensor) -> torch.Tensor:
+        """Sample a (1, 1, G, G, G) scalar field at particle positions using trilinear interpolation.
+        
+        Returns: (N,) tensor of field values at each particle's position.
+        """
+        if field.dim() == 3:
+            field = field.unsqueeze(0).unsqueeze(0)
+        norm = 2.0 * (pos - self.GRID_MIN) / (self.GRID_MAX - self.GRID_MIN) - 1.0
+        grid = norm.flip(-1).unsqueeze(0).unsqueeze(0).unsqueeze(0)  # (1, 1, 1, N, 3)
+        grid = grid.to(dtype=field.dtype)
+        sampled = F.grid_sample(
+            field, grid,
+            mode='bilinear', padding_mode='border', align_corners=True,
+        )
+        return sampled[0, 0, 0, 0, :]  # (N,)
 
     def _deposit_particles(self, state: torch.Tensor):
         """Deposit particle phase into the FDTD grid (Eulerian emission)."""
