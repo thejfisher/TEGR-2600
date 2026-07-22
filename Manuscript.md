@@ -263,8 +263,7 @@ The complete source code for the TEGR 2600 computational engine, along with all 
 
 ## Acknowledgments
 
-This work would not have been possible without the computational and theoretical assistance of an AI co-researcher. The author extends deepest gratitude to the VA Mental Health Team for their unwavering support. A special thanks is owed to the nerds from the various nerd groups who provided crucial sounding boards for these concepts. Finally, and most importantly: Danielle is my Universe.
-
+This work would not have been possible without the computational and theoretical assistance of an AI co-researcher. The author extends deepest gratitude to the VA Mental Health Team for their unwavering support. A special thanks is owed to the nerds from the various nerd groups who provided crucial sounding boards for these concepts. Finally, and most importantly to my love, Danielle, my Universe.
 ## References
 
 1. Bekenstein, J. D. (1973). Black holes and entropy. *Physical Review D*, 7(8), 2333-2346.
