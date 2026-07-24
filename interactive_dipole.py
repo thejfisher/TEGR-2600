@@ -92,7 +92,7 @@ def create_interactive_visual():
     
     # Map the gradient equation to the outer sphere
     pred_T_dipole = nx * dipole_dir[0] + ny * dipole_dir[1] + nz * dipole_dir[2]
-    pred_T_grid = nx**4 + ny**4 + nz**4
+    pred_T_grid = nx**4 + ny**4 + nz**4 + 0.2 * splotchy_noise
     pred_cmb_combined = 1.0 * pred_T_dipole + 0.3 * pred_T_grid
     
     # Create an opacity gradient (dark/opaque near the inner sphere, fading to transparent on the outside)
@@ -171,31 +171,63 @@ def create_interactive_visual():
                 type="buttons",
                 direction="down",
                 x=0.01,
-                y=0.85,
+                y=0.90,
                 xanchor="left",
                 yanchor="top",
                 font=dict(color="black"),
                 bgcolor="white",
                 buttons=list([
                     dict(
-                        label="Combined CMB",
+                        label="Inner: Combined CMB",
                         method="restyle",
-                        args=[{"surfacecolor": [cmb_combined]}, [3]]
+                        args=[{"surfacecolor": [cmb_combined]}, [4]]
                     ),
                     dict(
-                        label="Dipole Only",
+                        label="Inner: Dipole Only",
                         method="restyle",
-                        args=[{"surfacecolor": [T_dipole]}, [3]]
+                        args=[{"surfacecolor": [T_dipole]}, [4]]
                     ),
                     dict(
-                        label="Thermal Grid Anisotropy",
+                        label="Inner: Thermal Grid",
                         method="restyle",
-                        args=[{"surfacecolor": [T_grid]}, [3]]
+                        args=[{"surfacecolor": [T_grid]}, [4]]
                     ),
                     dict(
-                        label="Clear (Sight Radius)",
+                        label="Inner: Clear",
                         method="restyle",
-                        args=[{"surfacecolor": [cmb_clear]}, [3]]
+                        args=[{"surfacecolor": [cmb_clear]}, [4]]
+                    )
+                ])
+            ),
+            dict(
+                type="buttons",
+                direction="down",
+                x=0.01,
+                y=0.65,
+                xanchor="left",
+                yanchor="top",
+                font=dict(color="black"),
+                bgcolor="white",
+                buttons=list([
+                    dict(
+                        label="Outer: Extrapolated Combined",
+                        method="restyle",
+                        args=[{"surfacecolor": [pred_cmb_combined], "visible": [True]}, [3]]
+                    ),
+                    dict(
+                        label="Outer: Extrapolated Dipole",
+                        method="restyle",
+                        args=[{"surfacecolor": [pred_T_dipole], "visible": [True]}, [3]]
+                    ),
+                    dict(
+                        label="Outer: Extrapolated Grid",
+                        method="restyle",
+                        args=[{"surfacecolor": [pred_T_grid], "visible": [True]}, [3]]
+                    ),
+                    dict(
+                        label="Outer: Hidden",
+                        method="restyle",
+                        args=[{"visible": [False]}, [3]]
                     )
                 ])
             )
