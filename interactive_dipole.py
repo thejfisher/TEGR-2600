@@ -84,6 +84,16 @@ def create_interactive_visual():
     cmb_combined = 1.0 * T_dipole + 0.3 * T_grid
     cmb_clear = np.zeros_like(T_dipole)
     
+    # Custom Colorscale for CMB (Dark Blue -> Transparent -> Dark Red)
+    cmb_colorscale = [
+        [0.0, 'rgba(0, 0, 139, 1.0)'],   # Dark Blue
+        [0.2, 'rgba(0, 0, 139, 0.8)'],   
+        [0.45, 'rgba(0, 0, 0, 0.0)'],    # Clear
+        [0.55, 'rgba(0, 0, 0, 0.0)'],    # Clear
+        [0.8, 'rgba(139, 0, 0, 0.8)'],   
+        [1.0, 'rgba(139, 0, 0, 1.0)']    # Dark Red
+    ]
+    
     # --- The Predictive Out-of-Bounds Sphere (Topological Triangulation) ---
     pred_radius = 0.55  # Extends past the observable sphere
     pred_x = earth_pos[0] + pred_radius * nx
@@ -95,6 +105,16 @@ def create_interactive_visual():
     pred_T_grid = nx**4 + ny**4 + nz**4 + 0.2 * splotchy_noise
     pred_cmb_combined = 1.0 * pred_T_dipole + 0.3 * pred_T_grid
     
+    # Clamp the predictive sphere so it doesn't extend outside the Event Horizon
+    # The event horizon is defined by x^4 + y^4 + z^4 = 0.4
+    # Anything outside this is in the Parent Universe, where our internal CMB plasma does not exist.
+    outside_horizon = (pred_x**4 + pred_y**4 + pred_z**4) > 0.4
+    
+    # We set the surfacecolor to NaN for points outside the horizon to clip the sphere
+    pred_cmb_combined[outside_horizon] = np.nan
+    pred_T_dipole[outside_horizon] = np.nan
+    pred_T_grid[outside_horizon] = np.nan
+    
     # Create an opacity gradient (dark/opaque near the inner sphere, fading to transparent on the outside)
     # Plotly doesn't natively support per-vertex opacity on Surface without tricks, 
     # but we can simulate the "fade to light/transparent" by altering the colorscale 
@@ -103,8 +123,8 @@ def create_interactive_visual():
     fig.add_trace(go.Surface(
         x=pred_x, y=pred_y, z=pred_z,
         surfacecolor=pred_cmb_combined,
-        opacity=0.15,  # Very faint compared to the 0.9 observable sphere
-        colorscale='RdBu_r', 
+        opacity=0.35,  # Increased slightly to make the dark colors visible
+        colorscale=cmb_colorscale, 
         showscale=False,
         name='Predicted Extrapolation (Unobservable)'
     ))
@@ -114,7 +134,7 @@ def create_interactive_visual():
         x=obs_x, y=obs_y, z=obs_z,
         surfacecolor=cmb_combined,
         opacity=0.9,
-        colorscale='RdBu_r', # Red is hot (core direction), Blue is cold (boundary direction)
+        colorscale=cmb_colorscale,
         showscale=True,
         colorbar=dict(title=dict(text='CMB Anisotropy', font=dict(color='white')), x=0.85, tickfont=dict(color='white')),
         name='Observable Universe (CMB Map)'
