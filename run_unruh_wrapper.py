@@ -33,16 +33,16 @@ def run_accelerated_unruh_experiment(config_path: str, acceleration: float = 15.
     # Run the loop and hook in the acceleration
     for tick in range(cfg.total_ticks):
         # 1. Step the engine
-        engine.step(engine.state)
+        engine.step()
         
         # 2. Hook: Apply continuous Rindler acceleration to Particle 0
         # State layout: [t, x, y, z, px, py, pz, m0, theta, gamma]
         # We add a * dt to the momentum (px) of Particle 0
         dp = acceleration * cfg.dt
-        engine.state.active_state[0, 4] += dp  # Update px
+        engine._state[0, 4] += dp  # Update px
         
         # 3. Save trajectory
-        hist_frame = engine.state.active_state.cpu().numpy().copy()
+        hist_frame = engine._state[:engine.active_count].cpu().numpy().copy()
         history.append(hist_frame)
         
         if (tick + 1) % 5000 == 0:

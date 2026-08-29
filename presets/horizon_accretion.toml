@@ -1,0 +1,31 @@
+max_particles = 2000
+total_ticks = 400
+dt = 0.05
+grid_size = 64
+grid_min = -15.0
+grid_max = 15.0
+
+# Initial Particles
+# A small dense cluster of particles in the center representing the initial singularity / knot
+particles = [
+    {pos = [0.0, 0.0, 0.0], mom = [0.0, 0.0, 0.0], mass = 50.0},
+    {pos = [0.1, 0.0, 0.0], mom = [0.0, 0.0, 0.0], mass = 50.0},
+    {pos = [-0.1, 0.0, 0.0], mom = [0.0, 0.0, 0.0], mass = 50.0},
+    {pos = [0.0, 0.1, 0.0], mom = [0.0, 0.0, 0.0], mass = 50.0},
+    {pos = [0.0, -0.1, 0.0], mom = [0.0, 0.0, 0.0], mass = 50.0}
+]
+
+# Topology / Diver settings
+c = 10.0
+emergent_source_strength = 0.5  # Creates the gravity sink
+emergent_horizons = true        # Enable impedance valve boundary
+
+# Horizon Injection (The inward pull)
+horizon_injection_rate = 5      # Inject 1 particle every 5 ticks
+horizon_injection_mass = 1.0    # Small incoming mass
+
+# Interactions
+kuramoto_enabled = false
+pauli_enabled = true
+pauli_repulsion = 0.5
+rae_enabled = false

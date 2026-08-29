@@ -9,7 +9,7 @@ total_ticks = 20000
 grid_resolution = 64
 wave_speed = 8.0
 wave_decay = 0.99
-warm_grid_noise = 0.0
+warm_grid_noise = 0.0001
 periodic_boundaries = true
 
 [damping]
@@ -34,11 +34,15 @@ rae_mode = true
 pilot_wave = false
 
 [kuramoto]
-kuramoto_enabled = false
+kuramoto_enabled = true
+kg_override = true
 
 [output]
 output_dir = "./output_unruh_regularized"
 save_trajectories = true
+
+[entanglement]
+type = "all_to_all"
 
 [particles]
 # Particle 0: The Rindler Detector

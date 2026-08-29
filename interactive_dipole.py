@@ -86,12 +86,12 @@ def create_interactive_visual():
     
     # Custom Colorscale for CMB (Dark Blue -> Transparent -> Dark Red)
     cmb_colorscale = [
-        [0.0, 'rgba(0, 0, 139, 1.0)'],   # Dark Blue
-        [0.2, 'rgba(0, 0, 139, 0.8)'],   
-        [0.45, 'rgba(0, 0, 0, 0.0)'],    # Clear
-        [0.55, 'rgba(0, 0, 0, 0.0)'],    # Clear
-        [0.8, 'rgba(139, 0, 0, 0.8)'],   
-        [1.0, 'rgba(139, 0, 0, 1.0)']    # Dark Red
+        [0.0, 'rgba(0, 0, 40, 1.0)'],    # Very Dark Blue
+        [0.2, 'rgba(0, 0, 80, 0.8)'],   
+        [0.45, 'rgba(255, 255, 255, 0.0)'],    # Clear (Transparent White)
+        [0.55, 'rgba(255, 255, 255, 0.0)'],    # Clear (Transparent White)
+        [0.8, 'rgba(80, 0, 0, 0.8)'],   
+        [1.0, 'rgba(40, 0, 0, 1.0)']     # Very Dark Red
     ]
     
     # --- The Predictive Out-of-Bounds Sphere (Topological Triangulation) ---
@@ -248,6 +248,28 @@ def create_interactive_visual():
                         label="Outer: Hidden",
                         method="restyle",
                         args=[{"visible": [False]}, [3]]
+                    )
+                ])
+            ),
+            dict(
+                type="buttons",
+                direction="down",
+                x=0.01,
+                y=0.40,
+                xanchor="left",
+                yanchor="top",
+                font=dict(color="black"),
+                bgcolor="white",
+                buttons=list([
+                    dict(
+                        label="Hide Dipole Vector",
+                        method="restyle",
+                        args=[{"visible": [False]}, [5, 6]]
+                    ),
+                    dict(
+                        label="Show Dipole Vector",
+                        method="restyle",
+                        args=[{"visible": [True]}, [5, 6]]
                     )
                 ])
             )
