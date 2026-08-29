@@ -1,0 +1,52 @@
+[system]
+name = "Unruh A/B Test: Point-Particle Divergence (1/r^4)"
+num_particles = 1
+max_particles = 100
+dt = 0.001
+total_ticks = 20000
+
+[grid]
+grid_resolution = 64
+wave_speed = 8.0
+wave_decay = 0.99
+warm_grid_noise = 0.0
+periodic_boundaries = true
+
+[damping]
+vacuum_enabled = true
+vacuum_damping = 0.005
+
+[torsion]
+torsion_coupling = 0.0
+
+[pauli]
+# THE PROBLEM: No spatial boundary, treating the detector as a mathematical point.
+# This causes the local field energy density to spike massively (the 1/r^4 divergence).
+pauli_enabled = false
+pauli_strength = 0.0
+pauli_power = 0
+
+[rae]
+rae_mode = true
+
+[pilot]
+pilot_wave = false
+
+[kuramoto]
+kuramoto_enabled = false
+
+[output]
+output_dir = "./output_unruh_divergence"
+save_trajectories = true
+
+[particles]
+# The Rindler Detector (moving at relativistic speeds to simulate acceleration)
+mass = [1.0]
+position_x = [32.0]
+position_y = [32.0]
+position_z = [32.0]
+velocity_x = [7.5]
+velocity_y = [0.0]
+velocity_z = [0.0]
+phase = [0.0]
+spin = [0.0]
