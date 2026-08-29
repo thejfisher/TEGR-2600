@@ -41,10 +41,10 @@ output_dir = "./output_unruh_regularized"
 save_trajectories = true
 
 [particles]
-# Particle 0: The Rindler Detector (starts stationary, accelerates toward the sink)
-# Particle 1: The Gravitational Sink (massive, pulls Particle 0 to simulate acceleration)
-mass = [1.0, 500.0]
-position_x = [10.0, 55.0]
+# Particle 0: The Rindler Detector
+# Particle 1: The Inertial Vacuum Reference
+mass = [1.0, 1.0]
+position_x = [10.0, 10.0]
 position_y = [32.0, 32.0]
 position_z = [32.0, 32.0]
 velocity_x = [0.0, 0.0]
