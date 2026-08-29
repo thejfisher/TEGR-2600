@@ -274,12 +274,13 @@ class EntropyCanvas(FigureCanvas):
             mean_phase = np.mean(hues, axis=1, keepdims=True)
             detrended = hues - mean_phase
 
-            # Compute coherence for subsystem A
-            a_idx = partition_a
-            sub_a = detrended[:, a_idx]
-            dtheta = sub_a[:, :, np.newaxis] - sub_a[:, np.newaxis, :]
-            coh_mean = np.mean(np.cos(dtheta))
-            purity = max(min(coh_mean, 1.0), 1e-10)
+            # Compute coherence for the FULL system (to show dynamic scrambling)
+            # rather than just subsystem A (which is a single particle and always flat)
+            dtheta = detrended[:, :, np.newaxis] - detrended[:, np.newaxis, :]
+            coh_matrix = np.mean(np.cos(dtheta), axis=0) # (N, N)
+            
+            # Use the squared coherence for global purity to match the UI console report
+            purity = float(np.clip(np.mean(coh_matrix**2), 1e-10, 1.0))
             entropy = -np.log(purity)
 
             purities.append(purity)
@@ -287,9 +288,9 @@ class EntropyCanvas(FigureCanvas):
             times.append(t_end)
 
         self.ax.plot(times, purities, color=HIGHLIGHT, linewidth=2,
-                    label='Purity Tr(rho^2)', alpha=0.9)
+                    label='Global Purity Tr(rho^2)', alpha=0.9)
         self.ax.plot(times, entropies, color='#00d2ff', linewidth=2,
-                    label='S2 Renyi Entropy', linestyle='--', alpha=0.9)
+                    label='Global S2 Entropy', linestyle='--', alpha=0.9)
 
         self.ax.set_xlabel("Tick", color=TEXT_COLOR, fontsize=9)
         self.ax.set_ylabel("Value", color=TEXT_COLOR, fontsize=9)
@@ -739,7 +740,7 @@ class TEGR2600Window(QMainWindow):
 
         # Full system purity from coherence matrix
         coh = report.get('coherence_matrix', coherence)
-        full_purity = float(np.mean(coh))
+        full_purity = float(np.mean(coh**2))
         full_s2 = -np.log(max(full_purity, 1e-10))
         self.log(f"Full system purity: {full_purity:.4f}")
         self.log(f"Full system S2:     {full_s2:.4f}")
