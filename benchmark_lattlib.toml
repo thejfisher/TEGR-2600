@@ -1,0 +1,50 @@
+[system]
+name = "Lattlib Thermalization Benchmark"
+num_particles = 2
+max_particles = 100
+dt = 0.001
+total_ticks = 20000
+
+[grid]
+grid_resolution = 64
+wave_speed = 65.0
+wave_decay = 0.95
+warm_grid_noise = 0.05
+periodic_boundaries = true
+
+[damping]
+vacuum_enabled = true
+vacuum_damping = 0.007
+
+[torsion]
+torsion_coupling = 1.0
+
+[pauli]
+pauli_enabled = true
+pauli_strength = 10.0
+pauli_power = 3
+
+[rae]
+rae_mode = false
+
+[pilot]
+pilot_wave = false
+pilot_wave_coupling = 0.0
+
+[kuramoto]
+kuramoto_enabled = false
+
+[output]
+output_dir = "./output_benchmark"
+save_trajectories = true
+
+[particles]
+mass = [1.0, 1.0]
+position_x = [0.0, 5.0]
+position_y = [0.0, 5.0]
+position_z = [0.0, 5.0]
+velocity_x = [0.0, 0.0]
+velocity_y = [0.0, 0.0]
+velocity_z = [0.0, 0.0]
+phase = [0.0, 0.0]
+spin = [0.5, 0.5]

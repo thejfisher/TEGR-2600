@@ -69,9 +69,11 @@ def load_experiment(filepath: str) -> Tuple[torch.Tensor, torch.Tensor, dict]:
         return _parse_toml(filepath)
     elif ext == '.md':
         return _parse_markdown(filepath)
+    elif ext == '.npy':
+        return _parse_npy(filepath)
     else:
         raise ValueError(
-            f"Unsupported file format '{ext}'. Use .csv, .toml, or .md"
+            f"Unsupported file format '{ext}'. Use .csv, .toml, .md, or .npy"
         )
 
 
@@ -201,8 +203,13 @@ def _parse_toml(filepath: str) -> Tuple[torch.Tensor, torch.Tensor, dict]:
 
     # Entanglement
     ent = data.get('entanglement', {})
-    pairs = ent.get('adjacency', [])
-    adjacency = _build_adjacency(pairs, n)
+    ent_type = ent.get('type', '')
+    if ent_type == 'all_to_all':
+        adjacency = torch.ones((n, n), dtype=torch.bool)
+        adjacency.fill_diagonal_(False)
+    else:
+        pairs = ent.get('adjacency', [])
+        adjacency = _build_adjacency(pairs, n)
 
     metadata = {
         'name': name,
@@ -327,6 +334,35 @@ def _parse_markdown(filepath: str) -> Tuple[torch.Tensor, torch.Tensor, dict]:
     }
 
     return state, adjacency, metadata
+
+# ---------------------------------------------------------------------------
+# NPY Parser (Lattlib Grid Import)
+# ---------------------------------------------------------------------------
+def _parse_npy(filepath: str) -> Tuple[torch.Tensor, torch.Tensor, dict]:
+    """
+    Parse a Lattlib .npy complex grid matrix.
+    Since this is a raw field and not a list of particles, we return
+    a dummy state vector of 0 particles, but package the grid in the metadata
+    so the engine can extract it during reset() if configured to do so.
+    """
+    import numpy as np
+    
+    grid_data = np.load(filepath)
+    
+    # We return a dummy 0-particle state vector.
+    state = torch.zeros((0, 10), dtype=torch.float32)
+    adjacency = torch.zeros((0, 0), dtype=torch.bool)
+    
+    metadata = {
+        'name': Path(filepath).stem,
+        'source': filepath,
+        'format': 'npy',
+        'num_particles': 0,
+        'grid_data': grid_data,  # Pass the raw grid through
+    }
+    
+    return state, adjacency, metadata
+
 
 
 # ---------------------------------------------------------------------------

@@ -169,7 +169,7 @@ class SimulationWorker(QThread):
     """Runs the TEGR 2600 engine in a background thread."""
 
     progress = pyqtSignal(int, int, dict)   # tick, total, stats
-    finished = pyqtSignal(object)           # trajectory ndarray
+    finished = pyqtSignal()                 # empty signal, trajectory is stored as attribute
     error = pyqtSignal(str)
     log_message = pyqtSignal(str)
 
@@ -178,6 +178,7 @@ class SimulationWorker(QThread):
         self.engine = engine
         self.state = state
         self.adjacency = adjacency
+        self.trajectory = None
 
     def run(self):
         try:
@@ -186,9 +187,11 @@ class SimulationWorker(QThread):
                 self.progress.emit(tick, total, stats)
 
             self.engine.set_progress_callback(on_progress)
-            trajectory = self.engine.run(self.state, self.adjacency)
-            self.finished.emit(trajectory)
+            self.trajectory = self.engine.run(self.state, self.adjacency)
+            self.finished.emit()
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.error.emit(str(e))
 
 
@@ -469,6 +472,28 @@ class TEGR2600Window(QMainWindow):
         self.btn_export.clicked.connect(self._export_results)
         self.btn_export.setEnabled(False)
         run_layout.addWidget(self.btn_export)
+        
+        self.btn_export_lattlib = QPushButton("Export to Lattlib (.npy)")
+        self.btn_export_lattlib.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {ACCENT};
+                color: #00ff00;
+                border: 1px solid #00ff00;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #00ff00;
+                color: black;
+            }}
+            QPushButton:disabled {{
+                background-color: #333;
+                color: #666;
+                border-color: #444;
+            }}
+        """)
+        self.btn_export_lattlib.clicked.connect(self._export_lattlib)
+        self.btn_export_lattlib.setEnabled(False)
+        run_layout.addWidget(self.btn_export_lattlib)
 
         left_panel.addWidget(run_group)
         left_panel.addStretch()
@@ -525,8 +550,10 @@ class TEGR2600Window(QMainWindow):
     # ---- File Loading ----
     def _load_file_dialog(self):
         filepath, _ = QFileDialog.getOpenFileName(
-            self, "Load Experiment File", "",
-            "All Supported (*.csv *.toml *.md);;CSV (*.csv);;TOML (*.toml);;Markdown (*.md)"
+            self,
+            "Load Experiment",
+            str(Path(__file__).parent),
+            "Experiment Files (*.toml *.csv *.md *.npy);;All Files (*)"
         )
         if filepath:
             self._load_file(filepath)
@@ -600,6 +627,7 @@ class TEGR2600Window(QMainWindow):
         # Disable controls during run
         self.btn_run.setEnabled(False)
         self.btn_export.setEnabled(False)
+        self.btn_export_lattlib.setEnabled(False)
         self.progress_bar.setValue(0)
 
         uj = self.config.pauli_strength / self.config.torsion_coupling if self.config.torsion_coupling > 0 else float('inf')
@@ -616,7 +644,7 @@ class TEGR2600Window(QMainWindow):
         self.log(f"  RAE Phase Clock:      {'ON' if self.config.rae_mode else 'OFF'}")
         self.log(f"  Pilot Wave Guidance:  {'ON' if self.config.pilot_wave else 'OFF'}")
         self.log(f"  Kuramoto Sync:        {'ON (validation)' if self.config.kuramoto_enabled else 'OFF (discovery)'}")
-        self.log(f"  Kuramoto K:           {self.config.kuramoto_K}")
+        self.log(f"  Kuramoto K:           {self.config.kuramoto_k}")
         self.log(f"  Vacuum Damping:       {'ON' if self.config.vacuum_enabled else 'OFF'} ({self.config.vacuum_damping})")
         self.log(f"  Wave Speed:           {self.config.wave_speed}")
         self.log(f"  Wave Decay:           {self.config.wave_decay}")
@@ -646,14 +674,16 @@ class TEGR2600Window(QMainWindow):
             f"{stats.get('elapsed', 0):.1f}s"
         )
 
-    def _on_finished(self, trajectory):
+    def _on_finished(self):
         self.sim_timer.stop()
-        self.trajectory = trajectory
+        act_N = self.state_vector.shape[0] if self.state_vector is not None else self.config.num_particles
+        self.trajectory = self.worker.trajectory[:, :act_N, :]
         self.progress_bar.setValue(100)
         self.btn_run.setEnabled(True)
         self.btn_export.setEnabled(True)
+        self.btn_export_lattlib.setEnabled(True)
 
-        T, N, _ = trajectory.shape
+        T, N, _ = self.trajectory.shape
         elapsed = time.time() - self.run_start_time
         
         # Log basic simulation metrics
@@ -760,6 +790,86 @@ class TEGR2600Window(QMainWindow):
         )
         self.log(f"Saved plots to {out_dir}")
         self.statusBar().showMessage(f"Results exported to {out_dir}")
+
+    def _export_lattlib(self):
+        if self.worker is None or self.worker.engine is None:
+            self.log("ERROR: No active simulation engine to export from.")
+            return
+            
+        out_dir = Path(self.config.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_file = out_dir / 'thermalized_lattice.npy'
+        
+        try:
+            # 1. Grab the 3D PyTorch tensor from the engine's current state
+            phi_3d = self.worker.engine._phi_curr.detach().cpu().numpy()
+            
+            # 2. Extract a 2D slice for 1+1D Schwinger
+            z_mid = phi_3d.shape[2] // 2
+            phi_2d = phi_3d[0, 0, :, :, z_mid] if phi_3d.ndim == 5 else phi_3d[:, :, z_mid]
+            
+            # 3. Map the TEGR scalar amplitude to U(1) compact phase angles [-pi, pi]
+            phase_array = np.mod(phi_2d, 2 * np.pi) - np.pi
+            
+            # 4. Convert to U(1) complex links
+            u1_links = np.exp(1j * phase_array)
+            
+            # 5. Save
+            np.save(out_file, u1_links)
+            
+            self.log(f"\n--- Lattlib Export Successful ---")
+            self.log(f"Extracted 2D U(1) Lattice Shape: {u1_links.shape}")
+            self.log(f"Saved Lattlib-compatible matrix to: {out_file}")
+            self.statusBar().showMessage(f"Lattlib matrix exported to {out_file.name}")
+            
+            # --- Automatic Lattlib Validation ---
+            self._run_lattlib_validation(u1_links)
+            
+        except Exception as e:
+            self.log(f"ERROR exporting to lattlib format: {e}")
+            self.statusBar().showMessage(f"Lattlib export failed: {e}")
+
+    def _run_lattlib_validation(self, u1_links):
+        """Attempts to run Kanwar's lattlib natively in the GUI to prove compatibility."""
+        self.log("\n--- Validating with Lattlib ---")
+        
+        import sys
+        import os
+        
+        # Inject the local lattlib path if it exists (for your machine)
+        local_lattlib = os.path.abspath(r"C:\Users\Myna Bird\.gemini\antigravity\brain\3269c25f-d3d1-4abe-b2a7-46f098d00d85\scratch\lattlib")
+        if os.path.exists(local_lattlib) and local_lattlib not in sys.path:
+            sys.path.append(local_lattlib)
+            
+        try:
+            from schwinger.schwinger import ensemble_plaqs
+            from schwinger.schwinger_heatbath import SchwingerHBAction
+        except ImportError:
+            self.log("Note: Lattlib not found in Python path. Skipping internal validation check.")
+            self.log("Dr. Kanwar's team will be able to load the .npy file on their end.")
+            return
+            
+        try:
+            Lx, Lt = u1_links.shape
+            cfg = np.zeros((2, Lx, Lt), dtype=complex)
+            cfg[0, :, :] = u1_links
+            cfg[1, :, :] = u1_links
+            
+            beta = 1.0
+            action = SchwingerHBAction(beta)
+            
+            initial_plaq = np.mean(ensemble_plaqs(cfg))
+            self.log(f"Initial Plaquette: {np.real(initial_plaq):.4f}")
+            
+            self.log("Running 50 Heatbath MCMC sweeps natively...")
+            for _ in range(50):
+                action.heatbath_update(cfg)
+                
+            final_plaq = np.mean(ensemble_plaqs(cfg))
+            self.log(f"Final Plaquette:   {np.real(final_plaq):.4f}")
+            self.log("Success! Lattlib MCMC seamlessly accepted and stepped the TEGR lattice.")
+        except Exception as e:
+            self.log(f"Lattlib validation error: {e}")
 
     # ---- Logging ----
     def log(self, msg: str):

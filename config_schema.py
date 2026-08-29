@@ -24,15 +24,22 @@ class SimulationConfig:
     # --- System ---
     name: str = "Untitled Experiment"
     num_particles: int = 4
+    max_particles: int = 5000  # For feeding black hole pre-allocation
 
     # --- Integration ---
     dt: float = 0.001
     total_ticks: int = 10000
 
+    # --- Black Hole Cosmology (Horizon Injection) ---
+    horizon_injection_rate: int = 0      # Ticks between new particle injections (0 = closed system)
+    horizon_injection_mass: float = 1.0  # Rest mass of incoming trace particles
+
     # --- FDTD Grid (3D Klein-Gordon) ---
     grid_resolution: int = 64    # cells per axis
     wave_speed: float = 65.0     # c in grid units
     wave_decay: float = 0.9999   # torsion decay multiplier per tick (1.0 = no decay)
+    warm_grid_noise: float = 0.0 # amplitude of random Gaussian noise injected at start
+    periodic_boundaries: bool = True # Use periodic boundaries (circular padding) for the FDTD grid
 
     # --- Pauli Exclusion ---
     pauli_strength: float = 10.0  # chi - exclusion coupling scalar
@@ -54,6 +61,9 @@ class SimulationConfig:
     # --- Entanglement (Kuramoto) ---
     kuramoto_enabled: bool = False  # OFF by default (discovery mode — no circular forcing)
     kuramoto_k: float = 50.0  # sync coupling strength (only active when kuramoto_enabled=True)
+
+    # --- Klein-Gordon Override ---
+    kg_override: bool = False  # If True, overrides Kuramoto synchronization with Klein-Gordon topological floor coupling
 
     # --- Pilot Wave ---
     pilot_wave: bool = True
