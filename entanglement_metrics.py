@@ -128,6 +128,8 @@ def compute_mutual_information(
     # for a continuous correlation matrix is given by the Gaussian formula:
     # I(A; B) = 0.5 * ln( det(C_A) * det(C_B) / det(C_AB) )
     
+    full: List[int] = partition_a + partition_b
+    
     sub_a = coherence[np.ix_(partition_a, partition_a)]
     sub_b = coherence[np.ix_(partition_b, partition_b)]
     sub_ab = coherence[np.ix_(full, full)]
