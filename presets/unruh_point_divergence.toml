@@ -24,7 +24,7 @@ torsion_coupling = 0.0
 # This causes the local field energy density to spike massively (the 1/r^4 divergence).
 pauli_enabled = false
 pauli_strength = 0.0
-pauli_power = 0
+pauli_power = 3
 
 [rae]
 rae_mode = true
