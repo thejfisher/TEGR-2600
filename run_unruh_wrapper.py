@@ -57,12 +57,11 @@ def run_accelerated_unruh_experiment(config_path: str, acceleration: float = 15.
     report = full_entanglement_report(trajectory, 2)
     
     print("\n--- Entanglement Report ---")
-    print(f"Full system purity: {report['full_system']['purity']:.4f}")
-    print(f"Full system S2:     {report['full_system']['entropy']:.4f}")
-    print(f"  Subsystem [0]: purity={report['subsystems']['0']['purity']:.4f}, S2={report['subsystems']['0']['entropy']:.4f}")
-    print(f"  Subsystem [1]: purity={report['subsystems']['1']['purity']:.4f}, S2={report['subsystems']['1']['entropy']:.4f}")
-    print(f"  MI([0], [1]) = {report['mutual_info']['0_1']:.4f}")
-    print(f"  MI([1], [0]) = {report['mutual_info']['1_0']:.4f}")
+    print(f"Full system purity: {report['purities']['[0, 1]']:.4f}")
+    print(f"Full system S2:     {report['entropies']['[0, 1]']:.4f}")
+    print(f"  Subsystem [0]: purity={report['purities']['[0]']:.4f}, S2={report['entropies']['[0]']:.4f}")
+    print(f"  Subsystem [1]: purity={report['purities']['[1]']:.4f}, S2={report['entropies']['[1]']:.4f}")
+    print(f"  MI([0], [1]) = {report['mutual_info']['([0], [1])']:.4f}")
 
     # Generate and save plots to mirror UI
     app = QApplication(sys.argv)
