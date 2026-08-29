@@ -1,9 +1,10 @@
 [system]
-name = "Unruh A/B Test: Point-Particle Divergence (1/r^4)"
+name = "Unruh A/B Test: Point Divergence (1/r^4)"
 num_particles = 2
 max_particles = 100
 dt = 0.001
 total_ticks = 20000
+rindler_acceleration = 15.0
 
 [grid]
 grid_resolution = 64

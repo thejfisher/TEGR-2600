@@ -594,6 +594,13 @@ class TEGR2600Engine:
         if tick % 10 == 0:
             self._deposit_particles(state_active)
 
+        # =====================================================
+        # 10. RINDLER ACCELERATION HOOK
+        # =====================================================
+        if getattr(cfg, 'rindler_acceleration', 0.0) > 0.0:
+            # Apply constant acceleration a*dt to Particle 0's px (momentum x)
+            state_active[0, 4] += cfg.rindler_acceleration * DT
+
         # Update time
         state_active[:, 0] = (tick + 1) * DT
         self._current_tick += 1

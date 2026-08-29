@@ -29,6 +29,7 @@ class SimulationConfig:
     # --- Integration ---
     dt: float = 0.001
     total_ticks: int = 10000
+    rindler_acceleration: float = 0.0
 
     # --- Black Hole Cosmology (Horizon Injection) ---
     horizon_injection_rate: int = 0      # Ticks between new particle injections (0 = closed system)
