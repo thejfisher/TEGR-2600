@@ -16,14 +16,14 @@ def run_accelerated_unruh_experiment(config_path: str, acceleration: float = 15.
     
     # Load configuration and initial state
     cfg = SimulationConfig.from_toml(config_path)
-    state, adjacency, _ = load_experiment(config_path)
+    initial_state, adjacency, _ = load_experiment(config_path)
     
     # Initialize Engine
     engine = TEGR2600Engine(cfg)
     device = engine.device
     
-    # Move state to device
-    state.active_state = state.active_state.to(device)
+    # Reset engine to initialize SimulationState internal object
+    engine.reset(initial_state, adjacency)
     
     history = []
     
@@ -33,16 +33,16 @@ def run_accelerated_unruh_experiment(config_path: str, acceleration: float = 15.
     # Run the loop and hook in the acceleration
     for tick in range(cfg.total_ticks):
         # 1. Step the engine
-        engine.step(state)
+        engine.step(engine.state)
         
         # 2. Hook: Apply continuous Rindler acceleration to Particle 0
         # State layout: [t, x, y, z, px, py, pz, m0, theta, gamma]
         # We add a * dt to the momentum (px) of Particle 0
         dp = acceleration * cfg.dt
-        state.active_state[0, 4] += dp  # Update px
+        engine.state.active_state[0, 4] += dp  # Update px
         
         # 3. Save trajectory
-        hist_frame = state.active_state.cpu().numpy().copy()
+        hist_frame = engine.state.active_state.cpu().numpy().copy()
         history.append(hist_frame)
         
         if (tick + 1) % 5000 == 0:

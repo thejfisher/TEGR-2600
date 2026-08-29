@@ -43,7 +43,7 @@ save_trajectories = true
 # Particle 0: The Rindler Detector
 # Particle 1: The Inertial Vacuum Reference
 mass = [1.0, 1.0]
-position_x = [10.0, 10.0]
+position_x = [10.0, 40.0]
 position_y = [32.0, 32.0]
 position_z = [32.0, 32.0]
 velocity_x = [0.0, 0.0]
