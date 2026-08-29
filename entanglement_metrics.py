@@ -83,8 +83,8 @@ def compute_subsystem_purity(
     sub: np.ndarray = coherence_matrix[
         np.ix_(subsystem_indices, subsystem_indices)
     ]
-    # Purity = mean of all coherence elements (diagonal entries = 1)
-    purity: float = float(np.mean(sub))
+    # Purity Tr(rho^2) maps to the mean of the *squared* coherence elements
+    purity: float = float(np.mean(sub**2))
     return float(np.clip(purity, 0.0, 1.0))
 
 
@@ -121,17 +121,25 @@ def compute_mutual_information(
     Returns:
         Mutual information I_AB.
     """
-    full: List[int] = partition_a + partition_b
-
-    purity_a: float = compute_subsystem_purity(coherence, partition_a)
-    purity_b: float = compute_subsystem_purity(coherence, partition_b)
-    purity_ab: float = compute_subsystem_purity(coherence, full)
-
-    s2_a: float = compute_renyi_entropy(purity_a)
-    s2_b: float = compute_renyi_entropy(purity_b)
-    s2_ab: float = compute_renyi_entropy(purity_ab)
-
-    return s2_a + s2_b - s2_ab
+    # For classical phase coherence (covariance) matrices, standard discrete
+    # subadditivity (S_A + S_B >= S_AB) is violated by the Tr(rho^2) mean mapping,
+    # causing uncorrelated states to return negative Mutual Information.
+    # The mathematically correct, strictly non-negative Mutual Information
+    # for a continuous correlation matrix is given by the Gaussian formula:
+    # I(A; B) = 0.5 * ln( det(C_A) * det(C_B) / det(C_AB) )
+    
+    sub_a = coherence[np.ix_(partition_a, partition_a)]
+    sub_b = coherence[np.ix_(partition_b, partition_b)]
+    sub_ab = coherence[np.ix_(full, full)]
+    
+    # Add a tiny epsilon to the diagonal for numerical stability
+    eps = 1e-12
+    det_a = max(np.linalg.det(sub_a + np.eye(len(partition_a))*eps), eps)
+    det_b = max(np.linalg.det(sub_b + np.eye(len(partition_b))*eps), eps)
+    det_ab = max(np.linalg.det(sub_ab + np.eye(len(full))*eps), eps)
+    
+    mi = 0.5 * np.log((det_a * det_b) / det_ab)
+    return float(max(mi, 0.0))
 
 
 # ---------------------------------------------------------------------------
