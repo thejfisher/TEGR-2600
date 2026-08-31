@@ -1,0 +1,32 @@
+[system]
+name = "Andres-Juanes 2026 Dissipative Entanglement"
+num_particles = 2
+
+[particles]
+mass = [ 1.0, 1.0,]
+mass_unit = "mev"
+position_x = [ -5.0, 5.0,]
+position_y = [ 0.0, 0.0,]
+position_z = [ 0.0, 0.0,]
+position_unit = "sim"
+phase = [ 0.0, 1.570796326,]
+velocity_x = [ 0.0, 0.0,]
+spin = [ 0.5, 0.5,]
+
+[coupling]
+pauli_strength = 5.0
+torsion_coupling = 1.0
+kuramoto_k = 0.0
+vacuum_damping = 0.02
+
+[integration]
+dt = 0.001
+total_ticks = 10000
+grid_resolution = 64
+wave_speed = 65.0
+wave_decay = 0.9999
+
+[output]
+save_trajectories = true
+save_plots = true
+plot_format = "png"
